@@ -1,6 +1,7 @@
 import pika
 import json
-import AMQPClient
+from chu.amqp_client import AMQPClient
+
 
 class Producer(AMQPClient):
     def publish(self, routing_key, body):
