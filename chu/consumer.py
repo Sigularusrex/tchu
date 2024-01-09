@@ -2,7 +2,7 @@ import pika
 import json
 import threading
 import time
-import AMQPClient
+from chu.AMQPClient import AMQPClient
 
 
 class Consumer(AMQPClient):
