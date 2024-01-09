@@ -36,7 +36,7 @@ class Consumer(AMQPClient):
             self.queue_name = result.method.queue
 
             for key in self.routing_keys:
-                self.channel.queue_bind(exchange=self.exchange, queue=self.queue_name, routing_key=key)
+                self.channel.queue_bind(exchange=exchange, queue=self.queue_name, routing_key=key)
 
             self.channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback_wrapper)
         except Exception as e:
