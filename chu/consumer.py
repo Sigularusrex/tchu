@@ -46,8 +46,10 @@ class Consumer(AMQPClient):
         if self.callback:
             self.callback(ch, method, properties, body)
         else:
-            data = json.loads(body)
-            print("Received an event but there is no callback function defined:", data)
+            print("Received an event but there is no callback function defined:", body)
+
+        ch.basic_ack(delivery_tag=method.delivery_tag)  # Acknowledge the message even if no callback is defined
+
 
     def run(self):
         max_attempts = 10
