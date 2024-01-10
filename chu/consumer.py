@@ -1,8 +1,15 @@
-import pika
-import json
 import threading
 import time
+
 from chu.amqp_client import AMQPClient
+import logging
+
+# Configure the logger
+logging.basicConfig(level=logging.INFO)  # Adjust log level as needed
+
+
+class ConnectionError(Exception):
+    pass
 
 
 class Consumer(AMQPClient):
@@ -40,10 +47,11 @@ class Consumer(AMQPClient):
 
             self.channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback_wrapper)
         except Exception as e:
-            raise f"Error initializing RabbitMQ connection: {e}"
+            ConnectionError(f"Error initializing RabbitMQ connection: {e}")
 
     def callback_wrapper(self, ch, method, properties, body):
         if self.callback:
+            print("Received an event:", body)
             self.callback(ch, method, properties, body)
         else:
             print("Received an event but there is no callback function defined:", body)
@@ -52,21 +60,22 @@ class Consumer(AMQPClient):
 
 
     def run(self):
-        max_attempts = 10
+        max_attempts = 1
         current_attempt = 0
 
         while current_attempt < max_attempts:
             try:
+                logging.info(f"Connecting, attempt {current_attempt}")
                 self.channel.start_consuming()
                 return
             except Exception as e:
                 current_attempt += 1
                 if current_attempt < max_attempts:
-                    print(f"Error initializing RabbitMQ connection: {e}. Retrying in {current_attempt * 2} seconds...")
+                    logging.info(f"Error initializing RabbitMQ connection: {e}. Retrying in {current_attempt * 2} seconds...")
                     time.sleep(current_attempt * 2)
                 else:
-                    raise f"Error initializing Pika/RabbitMQ connection: {e}"
-        print("Started Consumer Thread")
+                    ConnectionError(f"Error initializing Pika/RabbitMQ connection: {e}")
+        logging.info("Started Consumer Thread")
 
 
 class ThreadedConsumer(threading.Thread, Consumer):
