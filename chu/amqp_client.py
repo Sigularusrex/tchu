@@ -19,6 +19,7 @@ class AMQPClient:
             self.params = pika.URLParameters(amqp_url)
             self.connection = pika.BlockingConnection(self.params)
             self.channel = self.connection.channel()
+            self.exchange = exchange
             self.channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
         except Exception as e:
             print(f"Error initializing RabbitMQ connection: {e}")
