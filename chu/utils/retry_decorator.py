@@ -15,7 +15,7 @@ def run_with_retries(method):
         while current_attempt < max_attempts:
             try:
                 logging.info(f"Connecting, attempt {current_attempt}")
-                response = method(**kwargs)
+                response = method(self, **kwargs)
                 return
             except Exception as e:
                 current_attempt += 1
