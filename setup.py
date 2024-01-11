@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="chu",
-    version="0.10",
+    version="1.0",
     packages=find_packages(),
     install_requires=[
         "pika",  # Add other dependencies here
