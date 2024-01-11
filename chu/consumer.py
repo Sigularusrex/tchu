@@ -1,5 +1,4 @@
 import threading
-import time
 
 from chu.amqp_client import AMQPClient
 from chu.utils.retry_decorator import run_with_retries
@@ -14,11 +13,37 @@ class ConnectionError(Exception):
 
 
 class Consumer(AMQPClient):
+    """
+    A class for consuming messages from an AMQP broker using RabbitMQ.
+
+    Attributes:
+    - exchange (str): The exchange name.
+    - exchange_type (str): The type of exchange.
+    - amqp_url (str): The URL for the AMQP broker.
+    - threads (int): The number of threads for concurrent message processing.
+    - routing_keys (list): List of routing keys for binding queues.
+    - callback (func): The callback function to be executed when a message is received.
+    - queue_name (str): The name of the queue used for message consumption.
+
+    Methods:
+    - __init__(amqp_url="amqp://guest:guest@localhost:5672/", exchange="default", exchange_type="topic",
+               threads=1, routing_keys=["*"], callback=None):
+        Initializes the Consumer instance, sets up the connection, and prepares for message consumption.
+    - callback_wrapper(ch, method, properties, body):
+        Wraps the callback function to handle received messages and acknowledge them.
+    - run():
+        Starts the message consumption process.
+
+    Note:
+    - The class inherits from AMQPClient, which provides the basic AMQP connection setup.
+    - The `run` method is designed to be overridden by subclasses for custom message processing logic.
+    """
+
     @run_with_retries
     def __init__(
         self,
-        amqp_url="amqp://guest:guest@rabbitmq:5672/",
-        exchange="coolset-events",
+        amqp_url="amqp://guest:guest@localhost:5672/",
+        exchange="default",
         exchange_type="topic",
         threads=1,
         routing_keys=["*"],
@@ -42,6 +67,7 @@ class Consumer(AMQPClient):
         - threads: Default is 1.
         - routing_keys: Default is ['*'].
         """
+
         super().__init__(amqp_url, exchange, exchange_type)
         self.threads = threads
         self.routing_keys = routing_keys if routing_keys else ["coolset.*"]
@@ -80,6 +106,19 @@ class Consumer(AMQPClient):
 
 
 class ThreadedConsumer(threading.Thread, Consumer):
+    """
+    Wraps the callback function to handle received messages and acknowledge them.
+
+    Args:
+    - ch (pika.Channel): The communication channel to the AMQP broker.
+    - method (pika.spec.Basic.Deliver): Contains delivery information.
+    - properties (pika.spec.BasicProperties): Message properties.
+    - body (bytes): The message body.
+
+    Note:
+    - This method is intended to be overridden by subclasses to provide custom message handling logic.
+    """
+
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self)
         Consumer.__init__(self, *args, **kwargs)

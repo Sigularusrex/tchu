@@ -7,6 +7,21 @@ logging.basicConfig(level=logging.INFO)  # Adjust log level as needed
 
 
 def run_with_retries(method):
+    """
+    A decorator that retries a method with a specified number of attempts and delay between retries.
+
+    Args:
+    - method (function): The method to be decorated.
+
+    Returns:
+    - wrapper (function): The decorated method.
+
+    Note:
+    - This decorator is commonly used for functions that involve network operations or connections.
+    - It logs retry attempts and delays for troubleshooting purposes.
+    - If the maximum number of attempts is reached, a ConnectionError is raised.
+    """
+
     @wraps(method)
     def wrapper(self, **kwargs):
         max_attempts = 10
