@@ -1,7 +1,13 @@
 import pika
 
+
 class AMQPClient:
-    def __init__(self, amqp_url='amqp://guest:guest@rabbitmq:5672/', exchange='coolset-events', exchange_type='topic'):
+    def __init__(
+        self,
+        amqp_url="amqp://guest:guest@rabbitmq:5672/",
+        exchange="coolset-events",
+        exchange_type="topic",
+    ):
         """
         Initialize the AMQPClient instance.
 
@@ -20,9 +26,12 @@ class AMQPClient:
             self.connection = pika.BlockingConnection(self.params)
             self.channel = self.connection.channel()
             self.exchange = exchange
-            self.channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
+            self.channel.exchange_declare(
+                exchange=exchange, exchange_type=exchange_type, durable=True
+            )
         except Exception as e:
             print(f"Error initializing RabbitMQ connection: {e}")
+            raise
 
     def close(self):
         self.connection.close()

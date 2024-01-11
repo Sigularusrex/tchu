@@ -25,7 +25,9 @@ def run_with_retries(method):
                     )
                     time.sleep(current_attempt * 2)
                 else:
-                    ConnectionError(f"Error initializing Pika/RabbitMQ connection: {e}")
+                    raise ConnectionError(
+                        f"Error initializing Pika/RabbitMQ connection: {e}"
+                    )
 
         response = method(**kwargs)
 
