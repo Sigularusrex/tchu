@@ -2,6 +2,7 @@ import threading
 import time
 
 from chu.amqp_client import AMQPClient
+from chu.utils.retry_decorator import run_with_retries
 import logging
 
 # Configure the logger
@@ -13,7 +14,16 @@ class ConnectionError(Exception):
 
 
 class Consumer(AMQPClient):
-    def __init__(self, amqp_url='amqp://guest:guest@rabbitmq:5672/', exchange='coolset-events', exchange_type='topic', threads=1, routing_keys=['*'], callback=None):
+    @run_with_retries
+    def __init__(
+        self,
+        amqp_url="amqp://guest:guest@rabbitmq:5672/",
+        exchange="coolset-events",
+        exchange_type="topic",
+        threads=1,
+        routing_keys=["*"],
+        callback=None,
+    ):
         """
         Initialize the Consumer instance.
 
@@ -34,18 +44,22 @@ class Consumer(AMQPClient):
         """
         super().__init__(amqp_url, exchange, exchange_type)
         self.threads = threads
-        self.routing_keys = routing_keys if routing_keys else ['coolset.*']
+        self.routing_keys = routing_keys if routing_keys else ["coolset.*"]
         self.callback = callback
 
         try:
-            self.channel.basic_qos(prefetch_count=self.threads*10)
-            result = self.channel.queue_declare('', exclusive=True, durable=True)
+            self.channel.basic_qos(prefetch_count=self.threads * 10)
+            result = self.channel.queue_declare("", exclusive=True, durable=True)
             self.queue_name = result.method.queue
 
             for key in self.routing_keys:
-                self.channel.queue_bind(exchange=self.exchange, queue=self.queue_name, routing_key=key)
+                self.channel.queue_bind(
+                    exchange=self.exchange, queue=self.queue_name, routing_key=key
+                )
 
-            self.channel.basic_consume(queue=self.queue_name, on_message_callback=self.callback_wrapper)
+            self.channel.basic_consume(
+                queue=self.queue_name, on_message_callback=self.callback_wrapper
+            )
         except Exception as e:
             ConnectionError(f"Error initializing RabbitMQ connection: {e}")
 
@@ -56,26 +70,13 @@ class Consumer(AMQPClient):
         else:
             print("Received an event but there is no callback function defined:", body)
 
-        ch.basic_ack(delivery_tag=method.delivery_tag)  # Acknowledge the message even if no callback is defined
+        ch.basic_ack(
+            delivery_tag=method.delivery_tag
+        )  # Acknowledge the message even if no callback is defined
 
-
+    @run_with_retries
     def run(self):
-        max_attempts = 1
-        current_attempt = 0
-
-        while current_attempt < max_attempts:
-            try:
-                logging.info(f"Connecting, attempt {current_attempt}")
-                self.channel.start_consuming()
-                return
-            except Exception as e:
-                current_attempt += 1
-                if current_attempt < max_attempts:
-                    logging.info(f"Error initializing RabbitMQ connection: {e}. Retrying in {current_attempt * 2} seconds...")
-                    time.sleep(current_attempt * 2)
-                else:
-                    ConnectionError(f"Error initializing Pika/RabbitMQ connection: {e}")
-        logging.info("Started Consumer Thread")
+        self.channel.start_consuming()
 
 
 class ThreadedConsumer(threading.Thread, Consumer):
