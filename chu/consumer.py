@@ -82,7 +82,7 @@ class Consumer(AMQPClient):
 
     def callback_wrapper(self, ch, method, properties, body):
         logger.info(f"Received an event: {body}")
-        RPC = "reply_to" in properties
+        RPC = properties.reply_to is not None  # Correctly check if 'reply_to' exists
         if self.callback:
             try:
                 response = self.callback(ch, method, properties, body)
