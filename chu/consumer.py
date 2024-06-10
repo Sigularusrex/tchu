@@ -85,7 +85,7 @@ class Consumer(AMQPClient):
         RPC = properties.reply_to is not None  # Correctly check if 'reply_to' exists
         if self.callback:
             try:
-                response = self.callback(ch, method, properties, body)
+                response = self.callback(ch, method, properties, body, RPC)
                 if RPC:
                     reply_properties = pika.BasicProperties(
                         correlation_id=properties.correlation_id
