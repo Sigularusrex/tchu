@@ -82,18 +82,17 @@ class Consumer(AMQPClient):
 
     def callback_wrapper(self, ch, method, properties, body):
         logger.info(f"Received an event: {body}")
-        RPC = properties.reply_to is not None  # Correctly check if 'reply_to' exists
+        RPC = properties.reply_to is not None
         if self.callback:
             try:
                 response = self.callback(ch, method, properties, body, RPC)
                 if RPC:
-                    reply_properties = pika.BasicProperties(
-                        correlation_id=properties.correlation_id
-                    )
+                    # reply_properties = pika.BasicProperties(
+                    #     correlation_id=properties.correlation_id
+                    # )
                     self.channel.basic_publish(
                         exchange="",
                         routing_key=properties.reply_to,
-                        properties=reply_properties,
                         body=response,
                     )
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
