@@ -97,7 +97,7 @@ class Consumer(AMQPClient):
             print("Received an event but there is no callback function defined:", body)
 
         ch.basic_ack(
-            delivery_tag=method.delivery_tag, multiple=True
+            delivery_tag=method.delivery_tag
         )  # Acknowledge the message even if no callback is defined
 
     @run_with_retries
