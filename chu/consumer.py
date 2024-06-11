@@ -87,13 +87,14 @@ class Consumer(AMQPClient):
             try:
                 response = self.callback(ch, method, properties, body, RPC)
                 if RPC:
-                    # reply_properties = pika.BasicProperties(
-                    #     correlation_id=properties.correlation_id
-                    # )
+                    reply_properties = pika.BasicProperties(
+                        correlation_id=properties.correlation_id
+                    )
                     self.channel.basic_publish(
                         exchange="",
                         routing_key=properties.reply_to,
                         body=response,
+                        properties=reply_properties,
                     )
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             except Exception as e:
