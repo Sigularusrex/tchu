@@ -1,9 +1,14 @@
 from typing import Union
+import logging
 import pika
 import json
 import uuid
 import time
 from chu.amqp_client import AMQPClient
+
+# Configure the logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Producer(AMQPClient):
@@ -77,9 +82,9 @@ class Producer(AMQPClient):
                 body=json.dumps(body),
                 properties=properties,
             )
-            print("Message published successfully")
+            logger.info("Message published successfully")
         except Exception as e:
-            print(f"Error publishing message: {e}")
+            logger.error(f"Error publishing message: {e}")
 
     def on_response(
         self,
@@ -125,12 +130,16 @@ class Producer(AMQPClient):
             content_type=content_type,
             delivery_mode=delivery_mode,
         )
-        self.channel.basic_publish(
-            exchange=self.exchange,
-            routing_key=routing_key,
-            body=json.dumps(body),
-            properties=properties,
-        )
+        try:
+            self.channel.basic_publish(
+                exchange=self.exchange,
+                routing_key=routing_key,
+                body=json.dumps(body),
+                properties=properties,
+            )
+            logger.info("RPC called successfully")
+        except Exception as e:
+            logger.error(f"Error calling RPC - message: {e}")
 
         start_time = time.time()
         while self.response is None and (time.time() - start_time) < timeout:
