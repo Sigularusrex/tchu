@@ -1,8 +1,12 @@
 import threading
 import logging
 import pika
+from pika.adapters.blocking_connection import BlockingChannel
+from pika.spec import Basic, BasicProperties
+from typing import Callable, Optional, List, Union
 from chu.amqp_client import AMQPClient
 from chu.utils.retry_decorator import run_with_retries
+
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO)
@@ -39,13 +43,17 @@ class Consumer(AMQPClient):
     @run_with_retries
     def __init__(
         self,
-        amqp_url="amqp://guest:guest@localhost:5672/",
-        exchange="default",
-        exchange_type="topic",
-        threads=1,
-        routing_keys=["*"],
-        callback=None,
-    ):
+        amqp_url: str = "amqp://guest:guest@localhost:5672/",
+        exchange: str = "default",
+        exchange_type: str = "topic",
+        threads: int = 1,
+        routing_keys: Optional[List[str]] = ["*"],
+        callback: Optional[
+            Callable[
+                [BlockingChannel, Basic.Deliver, BasicProperties, bytes, bool], None
+            ]
+        ] = None,
+    ) -> None:
         """
         Initialize the Consumer instance.
 
@@ -80,7 +88,13 @@ class Consumer(AMQPClient):
             logger.error(f"Error initializing RabbitMQ connection: {e}")
             raise ConnectionError(f"Error initializing RabbitMQ connection: {e}")
 
-    def callback_wrapper(self, ch, method, properties, body):
+    def callback_wrapper(
+        self,
+        ch: BlockingChannel,
+        method: Basic.Deliver,
+        properties: BasicProperties,
+        body: bytes,
+    ) -> None:
         logger.info(f"Received an event: {body}")
         RPC = properties.reply_to is not None
         if self.callback:
@@ -120,7 +134,7 @@ class ThreadedConsumer(threading.Thread, Consumer):
     A class that wraps the Consumer class to handle message consumption in a separate thread.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: tuple, **kwargs: dict) -> None:
         threading.Thread.__init__(self)
         Consumer.__init__(self, *args, **kwargs)
 

@@ -1,3 +1,4 @@
+from typing import Union
 import pika
 import json
 import uuid
@@ -18,9 +19,9 @@ class Producer(AMQPClient):
 
     def __init__(
         self,
-        amqp_url="amqp://guest:guest@localhost:5672/",
-        exchange="default",
-        exchange_type="topic",
+        amqp_url: str = "amqp://guest:guest@localhost:5672/",
+        exchange: str = "default",
+        exchange_type: str = "topic",
     ):
         """
         Initialize the Producer instance and setup the exchange.
@@ -47,7 +48,11 @@ class Producer(AMQPClient):
         self.corr_id = None
 
     def publish(
-        self, routing_key, body, content_type="application/json", delivery_mode=2
+        self,
+        routing_key: str,
+        body: Union[dict, str],
+        content_type: str = "application/json",
+        delivery_mode: int = 2,
     ):
         """
         Publish a message to the specified routing key on the AMQP broker.
@@ -76,17 +81,23 @@ class Producer(AMQPClient):
         except Exception as e:
             print(f"Error publishing message: {e}")
 
-    def on_response(self, ch, method, props, body):
+    def on_response(
+        self,
+        ch: pika.channel.Channel,
+        method: pika.spec.Basic.Deliver,
+        props: pika.spec.BasicProperties,
+        body: bytes,
+    ) -> None:
         if self.corr_id == props.correlation_id:
             self.response = body
 
     def call(
         self,
-        routing_key,
-        body,
-        content_type="application/json",
-        delivery_mode=2,
-        timeout=30,
+        routing_key: str,
+        body: Union[dict, str],
+        content_type: str = "application/json",
+        delivery_mode: int = 2,
+        timeout: int = 30,
     ):
         """
         Send a message to the specified routing key and wait for a response.
