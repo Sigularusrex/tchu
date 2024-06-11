@@ -99,7 +99,10 @@ class Consumer(AMQPClient):
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             except Exception as e:
                 logger.error(f"Error in callback processing: {e}")
-                ch.basic_nack(delivery_tag=method.delivery_tag, multiple=True)
+                # Even if there is an error, we still acknowledge the message to avoid reprocessing
+                ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+                # leaving the 'nack' here for the future in case we want to retry the message (nack is negative acknowledgment)
+                # ch.basic_nack(delivery_tag=method.delivery_tag, multiple=True)
         else:
             logger.warning(
                 "Received an event but there is no callback function defined"
