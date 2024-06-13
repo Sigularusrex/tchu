@@ -1,11 +1,16 @@
 import threading
-
+import logging
+import pika
+from pika.adapters.blocking_connection import BlockingChannel
+from pika.spec import Basic, BasicProperties
+from typing import Callable, Optional, List, Union
 from chu.amqp_client import AMQPClient
 from chu.utils.retry_decorator import run_with_retries
-import logging
+
 
 # Configure the logger
-logging.basicConfig(level=logging.INFO)  # Adjust log level as needed
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ConnectionError(Exception):
@@ -33,22 +38,22 @@ class Consumer(AMQPClient):
         Wraps the callback function to handle received messages and acknowledge them.
     - run():
         Starts the message consumption process.
-
-    Note:
-    - The class inherits from AMQPClient, which provides the basic AMQP connection setup.
-    - The `run` method is designed to be overridden by subclasses for custom message processing logic.
     """
 
     @run_with_retries
     def __init__(
         self,
-        amqp_url="amqp://guest:guest@localhost:5672/",
-        exchange="default",
-        exchange_type="topic",
-        threads=1,
-        routing_keys=["*"],
-        callback=None,
-    ):
+        amqp_url: str = "amqp://guest:guest@localhost:5672/",
+        exchange: str = "default",
+        exchange_type: str = "topic",
+        threads: int = 1,
+        routing_keys: Optional[List[str]] = ["*"],
+        callback: Optional[
+            Callable[
+                [BlockingChannel, Basic.Deliver, BasicProperties, bytes, bool], None
+            ]
+        ] = None,
+    ) -> None:
         """
         Initialize the Consumer instance.
 
@@ -59,21 +64,14 @@ class Consumer(AMQPClient):
         - threads (int): The number of threads.
         - routing_keys (list): List of routing keys for binding queues.
         - callback (func): The callback function to be executed when a message is received.
-
-        Note:
-        - amqp_url: Default is 'amqp://guest:guest@localhost:5672/'.
-        - exchange: Default is 'default'.
-        - exchange_type: Default is 'topic'.
-        - threads: Default is 1.
-        - routing_keys: Default is ['*'].
         """
-
-        super().__init__(amqp_url, exchange, exchange_type)
+        super().__init__(amqp_url)
         self.threads = threads
-        self.routing_keys = routing_keys if routing_keys else ["coolset.*"]
+        self.routing_keys = routing_keys
         self.callback = callback
 
         try:
+            self.setup_exchange(exchange, exchange_type)
             self.channel.basic_qos(prefetch_count=self.threads * 10)
             result = self.channel.queue_declare("", exclusive=True, durable=True)
             self.queue_name = result.method.queue
@@ -87,39 +85,56 @@ class Consumer(AMQPClient):
                 queue=self.queue_name, on_message_callback=self.callback_wrapper
             )
         except Exception as e:
-            ConnectionError(f"Error initializing RabbitMQ connection: {e}")
+            logger.error(f"Error initializing RabbitMQ connection: {e}")
+            raise ConnectionError(f"Error initializing RabbitMQ connection: {e}")
 
-    def callback_wrapper(self, ch, method, properties, body):
+    def callback_wrapper(
+        self,
+        ch: BlockingChannel,
+        method: Basic.Deliver,
+        properties: BasicProperties,
+        body: bytes,
+    ) -> None:
+        logger.info(f"Received an event: {body}")
+        RPC = properties.reply_to is not None
         if self.callback:
-            print("Received an event:", body)
-            self.callback(ch, method, properties, body)
+            try:
+                response = self.callback(ch, method, properties, body, RPC)
+                if RPC:
+                    reply_properties = pika.BasicProperties(
+                        correlation_id=properties.correlation_id
+                    )
+                    self.channel.basic_publish(
+                        exchange="",
+                        routing_key=properties.reply_to,
+                        body=response,
+                        properties=reply_properties,
+                    )
+                ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+            except Exception as e:
+                logger.error(f"Error in callback processing: {e}")
+                # Even if there is an error, we still acknowledge the message to avoid reprocessing
+                ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+                # leaving the 'nack' here for the future in case we want to retry the message (nack is negative acknowledgment)
+                # ch.basic_nack(delivery_tag=method.delivery_tag, multiple=True)
         else:
-            print("Received an event but there is no callback function defined:", body)
-
-        ch.basic_ack(
-            delivery_tag=method.delivery_tag, multiple=True
-        )  # Acknowledge the message even if no callback is defined
+            logger.warning(
+                "Received an event but there is no callback function defined"
+            )
+            ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
 
     @run_with_retries
     def run(self):
+        logger.info("Starting message consumption")
         self.channel.start_consuming()
 
 
 class ThreadedConsumer(threading.Thread, Consumer):
     """
-    Wraps the callback function to handle received messages and acknowledge them.
-
-    Args:
-    - ch (pika.Channel): The communication channel to the AMQP broker.
-    - method (pika.spec.Basic.Deliver): Contains delivery information.
-    - properties (pika.spec.BasicProperties): Message properties.
-    - body (bytes): The message body.
-
-    Note:
-    - This method is intended to be overridden by subclasses to provide custom message handling logic.
+    A class that wraps the Consumer class to handle message consumption in a separate thread.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: tuple, **kwargs: dict) -> None:
         threading.Thread.__init__(self)
         Consumer.__init__(self, *args, **kwargs)
 
