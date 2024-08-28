@@ -27,6 +27,7 @@ class Producer(AMQPClient):
         amqp_url: str = "amqp://guest:guest@localhost:5672/",
         exchange: str = "default",
         exchange_type: str = "topic",
+        max_priority: int = 5,
     ):
         """
         Initialize the Producer instance and setup the exchange.
@@ -51,6 +52,7 @@ class Producer(AMQPClient):
             on_message_callback=self.on_response,
             auto_ack=True,
         )
+        self.max_priority = max_priority
 
         self.response = None
         self.corr_id = None
