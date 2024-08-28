@@ -40,7 +40,10 @@ class Producer(AMQPClient):
         self.setup_exchange(exchange, exchange_type)
 
         # Declare a callback queue for receiving responses
-        result = self.channel.queue_declare(queue="", exclusive=True)
+        result = self.channel.queue_declare(
+            queue="", exclusive=True, arguments={"x-max-priority": self.max_priority}
+        )
+
         self.callback_queue = result.method.queue
 
         self.channel.basic_consume(

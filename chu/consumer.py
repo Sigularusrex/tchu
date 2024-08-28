@@ -109,7 +109,8 @@ class Consumer(AMQPClient):
                 response = self.callback(ch, method, properties, body, RPC)
                 if RPC:
                     reply_properties = pika.BasicProperties(
-                        correlation_id=properties.correlation_id
+                        correlation_id=properties.correlation_id,
+                        priority=5,
                     )
                     self.channel.basic_publish(
                         exchange="",
