@@ -61,6 +61,7 @@ class Producer(AMQPClient):
         body: Union[dict, str],
         content_type: str = "application/json",
         delivery_mode: int = 2,
+        priority: int = 0,
     ):
         """
         Publish a message to the specified routing key on the AMQP broker.
@@ -76,8 +77,12 @@ class Producer(AMQPClient):
         - Exception: If there is an error during the message publishing process.
         """
         try:
+            # Note: I have added a priority parameter to the publish method, however I don't expect it
+            # to work until we have implemented Celery (pubsub) priorities.
             properties = pika.BasicProperties(
-                content_type=content_type, delivery_mode=delivery_mode
+                content_type=content_type,
+                delivery_mode=delivery_mode,
+                priority=priority,
             )
             self.channel.basic_publish(
                 exchange=self.exchange,
