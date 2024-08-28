@@ -129,6 +129,7 @@ class Producer(AMQPClient):
             correlation_id=self.corr_id,
             content_type=content_type,
             delivery_mode=delivery_mode,
+            priority=5,
         )
         try:
             self.channel.basic_publish(

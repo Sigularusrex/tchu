@@ -53,6 +53,7 @@ class Consumer(AMQPClient):
                 [BlockingChannel, Basic.Deliver, BasicProperties, bytes, bool], None
             ]
         ] = None,
+        max_priority: int = 5,
     ) -> None:
         """
         Initialize the Consumer instance.
@@ -69,11 +70,17 @@ class Consumer(AMQPClient):
         self.threads = threads
         self.routing_keys = routing_keys
         self.callback = callback
+        self.max_priority = max_priority
 
         try:
             self.setup_exchange(exchange, exchange_type)
             self.channel.basic_qos(prefetch_count=self.threads * 10)
-            result = self.channel.queue_declare("", exclusive=True, durable=True)
+            result = self.channel.queue_declare(
+                "",
+                exclusive=True,
+                durable=True,
+                arguments={"x-max-priority": self.max_priority},
+            )
             self.queue_name = result.method.queue
 
             for key in self.routing_keys:
