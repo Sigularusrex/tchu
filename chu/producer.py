@@ -42,7 +42,7 @@ class Producer(AMQPClient):
 
         # Declare a callback queue for receiving responses
         result = self.channel.queue_declare(
-            queue="", exclusive=True, arguments={"x-max-priority": self.max_priority}
+            queue="", exclusive=True, arguments={"x-max-priority": max_priority}
         )
 
         self.callback_queue = result.method.queue
@@ -52,7 +52,6 @@ class Producer(AMQPClient):
             on_message_callback=self.on_response,
             auto_ack=True,
         )
-        self.max_priority = max_priority
 
         self.response = None
         self.corr_id = None
