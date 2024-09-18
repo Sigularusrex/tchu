@@ -1,9 +1,10 @@
 import threading
 import logging
+import time
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
-from typing import Callable, Optional, List, Union
+from typing import Callable, Optional, List
 from chu.amqp_client import AMQPClient
 from chu.utils.retry_decorator import run_with_retries
 
@@ -53,26 +54,48 @@ class Consumer(AMQPClient):
                 [BlockingChannel, Basic.Deliver, BasicProperties, bytes, bool], None
             ]
         ] = None,
+        idle_handler: Optional[Callable[[], None]] = None,
+        idle_interval: int = 3600,
     ) -> None:
         """
         Initialize the Consumer instance.
 
+        This method sets up the AMQP connection, configures the exchange and queue,
+        and prepares for message consumption. It also initializes the idle handler
+        functionality for performing periodic tasks.
+
         Args:
-        - amqp_url (str): The URL for the AMQP broker.
-        - exchange (str): The exchange name.
-        - exchange_type (str): The type of exchange.
-        - threads (int): The number of threads.
-        - routing_keys (list): List of routing keys for binding queues.
-        - callback (func): The callback function to be executed when a message is received.
+        - amqp_url (str): The URL for the AMQP broker. Defaults to "amqp://guest:guest@localhost:5672/".
+        - exchange (str): The name of the exchange to use. Defaults to "default".
+        - exchange_type (str): The type of exchange (e.g., "topic", "direct", "fanout"). Defaults to "topic".
+        - threads (int): The number of threads for concurrent message processing. Defaults to 1.
+        - routing_keys (list): List of routing keys for binding queues. Defaults to ["*"].
+        - callback (Callable): The callback function to be executed when a message is received.
+            It should accept the following parameters:
+            - ch (BlockingChannel): The channel object.
+            - method (Basic.Deliver): The message delivery information.
+            - properties (BasicProperties): The message properties.
+            - body (bytes): The message body.
+            - RPC (bool): Indicates whether this is an RPC call.
+        - idle_handler (Callable): A function to be called periodically during idle time.
+            It takes no parameters and is used for maintenance tasks. Defaults to None.
+        - idle_interval (int): The interval in seconds between idle handler calls. Defaults to 3600 (1 hour).
+
+        Raises:
+        - ConnectionError: If there's an error initializing the RabbitMQ connection.
         """
         super().__init__(amqp_url)
         self.threads = threads
         self.routing_keys = routing_keys
         self.callback = callback
+        self.idle_handler = idle_handler
+        self.idle_interval = idle_interval
+        self.last_idle_time = time.time()
+        self._stop_event = threading.Event()
 
         try:
             self.setup_exchange(exchange, exchange_type)
-            self.channel.basic_qos(prefetch_count=self.threads * 10)
+            self.channel.basic_qos(prefetch_count=self.threads)
             result = self.channel.queue_declare("", exclusive=True, durable=True)
             self.queue_name = result.method.queue
 
@@ -126,7 +149,21 @@ class Consumer(AMQPClient):
     @run_with_retries
     def run(self):
         logger.info("Starting message consumption")
-        self.channel.start_consuming()
+        while not self._stop_event.is_set():
+            # Process messages for a short time
+            self.connection.process_data_events(time_limit=60)  # Process for 1 minute
+
+            # Check if it's time to call the idle handler
+            current_time = time.time()
+            if self.idle_handler and (
+                current_time - self.last_idle_time >= self.idle_interval
+            ):
+                try:
+                    self.idle_handler()
+                except Exception as e:
+                    logger.error(f"Error in idle handler: {e}")
+                finally:
+                    self.last_idle_time = current_time
 
 
 class ThreadedConsumer(threading.Thread, Consumer):
