@@ -4,7 +4,7 @@ import time
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
-from typing import Callable, Optional, List, Union
+from typing import Callable, Optional, List
 from chu.amqp_client import AMQPClient
 from chu.utils.retry_decorator import run_with_retries
 
