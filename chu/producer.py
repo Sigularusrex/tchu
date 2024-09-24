@@ -123,6 +123,7 @@ class Producer(AMQPClient):
         """
         self.response = None
         self.corr_id = str(uuid.uuid4())
+        start_time = time.time()
 
         properties = pika.BasicProperties(
             reply_to=self.callback_queue,
@@ -141,11 +142,14 @@ class Producer(AMQPClient):
         except Exception as e:
             logger.error(f"Error calling RPC - message: {e}")
 
-        start_time = time.time()
         while self.response is None and (time.time() - start_time) < timeout:
             self.connection.process_data_events(time_limit=timeout)
 
         if self.response is None:
             raise TimeoutError("No response received within the timeout period")
+
+        # log the execution time of the RPC call
+        execution_time = time.time() - start_time
+        logger.info(f"RPC call executed in {execution_time:.2f} seconds")
 
         return json.loads(self.response)
