@@ -30,8 +30,7 @@ def run_with_retries(method):
         while current_attempt < max_attempts:
             try:
                 logging.info(f"Connecting, attempt {current_attempt}")
-                response = method(self, **kwargs)
-                return
+                return method(self, **kwargs)
             except Exception as e:
                 current_attempt += 1
                 if current_attempt < max_attempts:
@@ -43,9 +42,5 @@ def run_with_retries(method):
                     raise ConnectionError(
                         f"Error initializing Pika/RabbitMQ connection: {e}"
                     )
-
-        response = method(**kwargs)
-
-        return response
 
     return wrapper
