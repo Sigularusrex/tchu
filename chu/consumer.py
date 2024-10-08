@@ -56,6 +56,7 @@ class Consumer(AMQPClient):
         ] = None,
         idle_handler: Optional[Callable[[], None]] = None,
         idle_interval: int = 3600,
+        prefetch_count: int = 1,
     ) -> None:
         """
         Initialize the Consumer instance.
@@ -95,7 +96,7 @@ class Consumer(AMQPClient):
 
         try:
             self.setup_exchange(exchange, exchange_type)
-            self.channel.basic_qos(prefetch_count=self.threads)
+            self.channel.basic_qos(prefetch_count=prefetch_count)
             result = self.channel.queue_declare("", exclusive=True, durable=True)
             self.queue_name = result.method.queue
 
@@ -147,7 +148,7 @@ class Consumer(AMQPClient):
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
 
     @run_with_retries
-    def run(self):
+    def run(self) -> None:
         logger.info("Starting message consumption")
         while not self._stop_event.is_set():
             # Process messages for a short time
