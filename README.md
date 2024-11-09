@@ -1,8 +1,10 @@
-# chu
+# tchu
 
-I got sick of needing a Pika listener on every app, so I made a small library called Chu, that does it for you. I'll update the docs soon, but essentially you can install Chu:
+A lightweight Python wrapper around Pika/RabbitMQ for easy event publishing and consuming.
 
-	chu @ git+https://github.com/Sigularusrex/chu@main
+## Installation
+
+	chu @ git+https://github.com/Sigularusrex/tchu@main
 
 
 make a management command like this:
@@ -10,10 +12,10 @@ make a management command like this:
 
 
 
-	from chu.consumer import ThreadedConsumer
+	from tchu.consumer import ThreadedConsumer
 	from django.core.management.base import BaseCommand
 
-	from gc_api.subscribers.chu_callback import chu_callback
+	from gc_api.subscribers.tchu_callback import tchu_callback
 	from settings import RABBITMQ_BROKER_URL
 
 
@@ -27,7 +29,7 @@ make a management command like this:
 				exchange_type="topic",
 				threads=5,
 				routing_keys=["event_topic.*"],
-				callback=chu_callback,
+				callback=tchu_callback,
 			)
 			# Start consuming messages
 			consumer.run()
@@ -37,7 +39,7 @@ import json
 	import celery_pubsub
 
 
-	def chu_callback(ch, method, properties, body):
+	def tchu_callback(ch, method, properties, body):
 		try:
 			print("External message received in Service A")
 			data = json.loads(body)
