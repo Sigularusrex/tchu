@@ -4,7 +4,7 @@ import pika
 import json
 import uuid
 import time
-from chu.amqp_client import AMQPClient
+from tchu.amqp_client import AMQPClient
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO)
