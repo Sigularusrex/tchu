@@ -73,8 +73,12 @@ class Producer(AMQPClient):
         - Exception: If there is an error during the message publishing process.
         """
         try:
+            self.corr_id = str(uuid.uuid4())
+
             properties = pika.BasicProperties(
-                content_type=content_type, delivery_mode=delivery_mode
+                content_type=content_type,
+                delivery_mode=delivery_mode,
+                message_id=self.corr_id,
             )
             self.channel.basic_publish(
                 exchange=self.exchange,
@@ -128,6 +132,7 @@ class Producer(AMQPClient):
         properties = pika.BasicProperties(
             reply_to=self.callback_queue,
             correlation_id=self.corr_id,
+            message_id=self.corr_id,
             content_type=content_type,
             delivery_mode=delivery_mode,
         )

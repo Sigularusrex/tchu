@@ -4,7 +4,7 @@ import time
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Protocol, TypeVar
 from tchu.amqp_client import AMQPClient
 from tchu.utils.retry_decorator import run_with_retries
 
@@ -16,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 class ConnectionError(Exception):
     pass
+
+
+class CacheProtocol(Protocol):
+    def add(self, key: str, value: str, time: int = 0) -> bool:
+        ...
+
+
+CacheType = TypeVar("CacheType", bound=CacheProtocol)
 
 
 class Consumer(AMQPClient):
@@ -57,6 +65,7 @@ class Consumer(AMQPClient):
         idle_handler: Optional[Callable[[], None]] = None,
         idle_interval: int = 3600,
         prefetch_count: int = 1,
+        cache: Optional[CacheProtocol] = None,
     ) -> None:
         """
         Initialize the Consumer instance.
@@ -81,6 +90,8 @@ class Consumer(AMQPClient):
         - idle_handler (Callable): A function to be called periodically during idle time.
             It takes no parameters and is used for maintenance tasks. Defaults to None.
         - idle_interval (int): The interval in seconds between idle handler calls. Defaults to 3600 (1 hour).
+        - prefetch_count (int): The maximum number of unacknowledged messages that can be processed simultaneously. Defaults to 1.
+        - cache (CacheProtocol): Optional cache implementation for message deduplication. Must implement the CacheProtocol. Defaults to None.
 
         Raises:
         - ConnectionError: If there's an error initializing the RabbitMQ connection.
@@ -93,6 +104,7 @@ class Consumer(AMQPClient):
         self.idle_interval = idle_interval
         self.last_idle_time = time.time()
         self._stop_event = threading.Event()
+        self.cache = cache
 
         try:
             self.setup_exchange(exchange, exchange_type)
@@ -121,6 +133,11 @@ class Consumer(AMQPClient):
     ) -> None:
         logger.info(f"Received an event: {body}")
         RPC = properties.reply_to is not None
+        message_id = properties.message_id
+        if self.cache and self._check_message_id(message_id):
+            logger.info(f"Message {message_id} already processed, skipping")
+            ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+            return
         if self.callback:
             try:
                 response = self.callback(ch, method, properties, body, RPC)
@@ -146,6 +163,18 @@ class Consumer(AMQPClient):
                 "Received an event but there is no callback function defined"
             )
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
+
+    def _check_message_id(self, message_id: str) -> bool:
+        """
+        Check if the message ID has already been processed using memcache.
+        Returns True if message was already processed, False otherwise.
+        """
+        if not message_id:
+            return False
+
+        cache_key = f"processed_tchu_message_{message_id}"
+        result = self.cache.add(cache_key, "1", time=10)
+        return not result
 
     @run_with_retries
     def run(self) -> None:
