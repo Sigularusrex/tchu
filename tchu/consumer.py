@@ -19,7 +19,7 @@ class ConnectionError(Exception):
 
 
 class CacheProtocol(Protocol):
-    def add(self, key: str, value: str, time: int = 0) -> bool:
+    def add(self, key: str, value: str, timeout: int = 300) -> bool:
         ...
 
 
@@ -173,7 +173,7 @@ class Consumer(AMQPClient):
             return False
 
         cache_key = f"processed_tchu_message_{message_id}"
-        result = self.cache.add(cache_key, "1", time=10)
+        result = self.cache.add(cache_key, "1")
         return not result
 
     @run_with_retries
