@@ -66,6 +66,7 @@ class Consumer(AMQPClient):
         idle_interval: int = 3600,
         prefetch_count: int = 1,
         cache: Optional[CacheProtocol] = None,
+        cache_key_prefix: str = "global",
     ) -> None:
         """
         Initialize the Consumer instance.
@@ -105,7 +106,7 @@ class Consumer(AMQPClient):
         self.last_idle_time = time.time()
         self._stop_event = threading.Event()
         self.cache = cache
-
+        self.cache_key_prefix = cache_key_prefix
         try:
             self.setup_exchange(exchange, exchange_type)
             self.channel.basic_qos(prefetch_count=prefetch_count)
@@ -172,7 +173,7 @@ class Consumer(AMQPClient):
         if not message_id:
             return False
 
-        cache_key = f"processed_tchu_message_{message_id}"
+        cache_key = f"processed_tchu_message_{self.cache_key_prefix}_{message_id}"
         result = self.cache.add(cache_key, "1")
         return not result
 
