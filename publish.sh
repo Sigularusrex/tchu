@@ -12,9 +12,16 @@ poetry build
 # Check the distribution
 poetry check
 
+# If a token is provided via environment variable, configure it
+if [ ! -z "$PYPI_TOKEN" ]; then
+  echo "Configuring PyPI token from environment variable"
+  poetry config pypi-token.pypi "$PYPI_TOKEN"
+fi
+
 # Upload to TestPyPI (optional)
 # poetry publish --repository testpypi
 
-# Upload to PyPI
+# Publish to PyPI
 # Uncomment the following line when ready to publish to PyPI
-# poetry publish 
+# poetry publish
+
