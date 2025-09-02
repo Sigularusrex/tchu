@@ -22,6 +22,5 @@ fi
 # poetry publish --repository testpypi
 
 # Publish to PyPI
-# Uncomment the following line when ready to publish to PyPI
 # poetry publish
 

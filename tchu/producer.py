@@ -5,6 +5,8 @@ import json
 import uuid
 import time
 from tchu.amqp_client import AMQPClient
+from tchu.utils.json_encoder import dumps_message, loads_message
+
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +85,7 @@ class Producer(AMQPClient):
             self.channel.basic_publish(
                 exchange=self.exchange,
                 routing_key=routing_key,
-                body=json.dumps(body),
+                body=dumps_message(body),
                 properties=properties,
             )
             logger.info("Message published successfully")
@@ -140,7 +142,7 @@ class Producer(AMQPClient):
             self.channel.basic_publish(
                 exchange=self.exchange,
                 routing_key=routing_key,
-                body=json.dumps(body),
+                body=dumps_message(body),
                 properties=properties,
             )
             logger.info("RPC called successfully")
@@ -157,4 +159,4 @@ class Producer(AMQPClient):
         execution_time = time.time() - start_time
         logger.info(f"RPC call executed in {execution_time:.2f} seconds")
 
-        return json.loads(self.response)
+        return loads_message(self.response.decode("utf-8"))

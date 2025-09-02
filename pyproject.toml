@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tchu"
-version = "0.1.0"
+version = "0.1.2"
 description = "A simple RabbitMQ/Pika wrapper for publishing and consuming events"
 authors = ["David Sigley <djsigley@gmail.com>"]
 license = "MIT"

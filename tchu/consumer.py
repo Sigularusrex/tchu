@@ -2,11 +2,13 @@ import threading
 import logging
 import time
 import pika
+import json
 from pika.adapters.blocking_connection import BlockingChannel
 from pika.spec import Basic, BasicProperties
-from typing import Callable, Optional, List, Protocol, TypeVar
+from typing import Callable, Optional, List, Protocol, TypeVar, Union
 from tchu.amqp_client import AMQPClient
 from tchu.utils.retry_decorator import run_with_retries
+from tchu.utils.json_encoder import loads_message, dumps_message
 
 
 # Configure the logger
@@ -59,7 +61,14 @@ class Consumer(AMQPClient):
         routing_keys: Optional[List[str]] = ["*"],
         callback: Optional[
             Callable[
-                [BlockingChannel, Basic.Deliver, BasicProperties, bytes, bool], None
+                [
+                    BlockingChannel,
+                    Basic.Deliver,
+                    BasicProperties,
+                    Union[dict, str, bytes],
+                    bool,
+                ],
+                None,
             ]
         ] = None,
         idle_handler: Optional[Callable[[], None]] = None,
@@ -86,7 +95,7 @@ class Consumer(AMQPClient):
             - ch (BlockingChannel): The channel object.
             - method (Basic.Deliver): The message delivery information.
             - properties (BasicProperties): The message properties.
-            - body (bytes): The message body.
+            - body (Union[dict, str, bytes]): The message body. Will be automatically deserialized from JSON if content_type is 'application/json'.
             - RPC (bool): Indicates whether this is an RPC call.
         - idle_handler (Callable): A function to be called periodically during idle time.
             It takes no parameters and is used for maintenance tasks. Defaults to None.
@@ -139,17 +148,39 @@ class Consumer(AMQPClient):
             logger.info(f"Message {message_id} already processed, skipping")
             ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)
             return
+
+        # Deserialize JSON content if content_type indicates JSON
+        processed_body = body
+        if properties.content_type == "application/json":
+            try:
+                processed_body = loads_message(body.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                logger.warning(
+                    f"Failed to deserialize JSON message: {e}. Passing raw bytes to callback."
+                )
+                processed_body = body
+
         if self.callback:
             try:
-                response = self.callback(ch, method, properties, body, RPC)
+                response = self.callback(ch, method, properties, processed_body, RPC)
                 if RPC:
                     reply_properties = pika.BasicProperties(
                         correlation_id=properties.correlation_id
                     )
+                    # Serialize response if it's not already a string or bytes
+                    if isinstance(response, (dict, list)) or hasattr(
+                        response, "__dict__"
+                    ):
+                        response_body = dumps_message(response)
+                    elif isinstance(response, str):
+                        response_body = response
+                    else:
+                        response_body = str(response)
+
                     self.channel.basic_publish(
                         exchange="",
                         routing_key=properties.reply_to,
-                        body=response,
+                        body=response_body,
                         properties=reply_properties,
                     )
                 ch.basic_ack(delivery_tag=method.delivery_tag, multiple=True)

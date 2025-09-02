@@ -1,5 +1,5 @@
-import pytest
 import json
+import uuid
 
 from unittest.mock import patch
 
@@ -45,3 +45,23 @@ def test_rpc_call(mock_connection, mock_channel):
 
         result = producer.call("test.route", {"test": "data"}, timeout=1)
         assert result == {"response": "data"}
+
+
+def test_publish_message_with_uuid(mock_connection, mock_channel):
+    """Test that messages containing UUID objects are properly serialized."""
+    with patch("pika.BlockingConnection", return_value=mock_connection):
+        mock_connection.channel.return_value = mock_channel
+        producer = Producer()
+
+        test_uuid = uuid.uuid4()
+        test_message = {"id": test_uuid, "name": "test_entity"}
+        producer.publish("test.route", test_message)
+
+        mock_channel.basic_publish.assert_called_once()
+        call_args = mock_channel.basic_publish.call_args[1]
+        assert call_args["routing_key"] == "test.route"
+
+        # Verify the body can be parsed and contains the UUID as a string
+        parsed_body = json.loads(call_args["body"])
+        assert parsed_body["id"] == str(test_uuid)
+        assert parsed_body["name"] == "test_entity"
